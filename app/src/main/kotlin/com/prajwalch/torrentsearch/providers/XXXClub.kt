@@ -25,7 +25,7 @@ class XXXClub(private val networkClient: NetworkClient) :
     override val url = "https://xxxclub.to"
     override val supportedCategories = setOf(Category.Porn)
     override val safetyStatus = SearchProviderSafetyStatus.Safe
-    override val enabledByDefault = false
+    override val enabledByDefault = true
 
     private val resultsPageParser = XXXClubResultsPageParser(name, networkClient)
 

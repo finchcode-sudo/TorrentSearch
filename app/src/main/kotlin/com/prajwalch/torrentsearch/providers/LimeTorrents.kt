@@ -32,6 +32,7 @@ class LimeTorrents(private val networkClient: NetworkClient) : SearchProvider,
         Category.Movies,
         Category.Music,
         Category.Series,
+        Category.Porn,
         Category.Other,
     )
     override val safetyStatus = SearchProviderSafetyStatus.Unsafe(
@@ -102,7 +103,7 @@ class LimeTorrents(private val networkClient: NetworkClient) : SearchProvider,
         Category.Games -> "Games"
         Category.Movies -> "Movies"
         Category.Music -> "Music"
-        Category.Porn -> throw IllegalStateException()
+        Category.Porn -> "Other"
         Category.Series -> "TV-shows"
         Category.Other -> "Other"
     }

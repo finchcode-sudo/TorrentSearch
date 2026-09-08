@@ -54,7 +54,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
      */
 
     val enableNSFWMode: Flow<Boolean> =
-        dataStore.getOrDefault(ENABLE_NSFW_MODE, false)
+        dataStore.getOrDefault(ENABLE_NSFW_MODE, true)
 
     val blurNSFWImages: Flow<Boolean> =
         dataStore.getOrDefault(BLUR_NSFW_IMAGES, true)

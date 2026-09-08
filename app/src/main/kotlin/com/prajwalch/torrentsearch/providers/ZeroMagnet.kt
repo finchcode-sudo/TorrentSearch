@@ -22,7 +22,7 @@ class ZeroMagnet(private val networkClient: NetworkClient) : SearchProvider,
     override val url = "https://9mag.net"
     override val supportedCategories = setOf(Category.Porn)
     override val safetyStatus = SearchProviderSafetyStatus.Safe
-    override val enabledByDefault = false
+    override val enabledByDefault = true
 
     private val resultsPageParser = ZeroMagnetResultsPageParser(name, networkClient)
 

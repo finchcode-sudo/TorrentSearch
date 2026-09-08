@@ -78,8 +78,8 @@
     <string name="settings_pure_black">纯黑</string>
     <string name="settings_group_general">通用</string>
     <string name="settings_language">语言</string>
-    <string name="settings_enable_nsfw_mode">显示不适宜内容</string>
-    <string name="settings_enable_nsfw_mode_summary">关闭时隐藏不适宜类别和搜索结果。</string>
+    <string name="settings_enable_nsfw_mode">显示成人内容</string>
+    <string name="settings_enable_nsfw_mode_summary">关闭时隐藏成人类别和搜索结果。</string>
     <string name="settings_group_search">搜索</string>
     <string name="settings_search_providers">搜索源</string>
     <string name="settings_search_providers_summary_format">已启用 %1$d 个（共 %2$d 个）</string>
@@ -199,8 +199,8 @@
     <string name="settings_open_torrent_details_in_app">在应用中打开种子详细页</string>
     <string name="settings_open_torrent_details_in_app_summary">直接在应用的原生界面打开种子详情页</string>
     <string name="settings_export_logs_to_file_summary">生成一个包含应用活动的文件，以帮助排查问题</string>
-    <string name="settings_blur_nsfw_images_summary">自动模糊不适宜内容的图片</string>
-    <string name="settings_blur_nsfw_images">模糊不适宜图片</string>
+    <string name="settings_blur_nsfw_images_summary">自动模糊成人内容的图片</string>
+    <string name="settings_blur_nsfw_images">模糊成人图片</string>
     <string name="tpb_unsafe_reason">由于监管不力，存在较多恶意软件投诉。</string>
     <string name="therarbg_unsafe_reason">原始 RARBG 的克隆站，充斥大量虚假种子。请谨慎使用。</string>
     <string name="search_filter_chip_hide_viewed">隐藏已浏览</string>

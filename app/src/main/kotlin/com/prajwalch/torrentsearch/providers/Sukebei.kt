@@ -23,7 +23,7 @@ class Sukebei(private val networkClient: NetworkClient) :
     override val url = "https://sukebei.nyaa.si"
     override val supportedCategories = setOf(Category.Porn)
     override val safetyStatus = SearchProviderSafetyStatus.Safe
-    override val enabledByDefault = false
+    override val enabledByDefault = true
 
     private val resultsPageParser = SukebeiResultsPageParser(providerName = name)
 

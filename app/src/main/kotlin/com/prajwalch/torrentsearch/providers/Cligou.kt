@@ -41,7 +41,13 @@ class Cligou(private val networkClient: NetworkClient) :
     override suspend fun search(query: String, category: Category): List<Torrent> {
         establishSession()
 
-        val word = Base64.getEncoder().encodeToString(query.toByteArray(Charsets.UTF_8))
+        // TorrentSearch 框架把关键词先做了 URL 编码（如 “神木丽” → %E7%A5...）。
+        // 而磁力狗要求的是 base64(原始 UTF-8 字节)，因此先逆解码回原文，再 base64。
+        val rawQuery = runCatching {
+            java.net.URLDecoder.decode(query, Charsets.UTF_8.name())
+        }.getOrElse { query }
+        val word = Base64.getEncoder()
+            .encodeToString(rawQuery.toByteArray(Charsets.UTF_8))
         val responseHtml = networkClient.getText("$url/search?word=$word&sort=time")
         if (responseHtml.contains(VERIFICATION_MARKER)) return emptyList()
 
@@ -97,7 +103,6 @@ class Cligou(private val networkClient: NetworkClient) :
         )
     }
 
-    /** 并发抓取某一大项的详情页，取得磁力链与 info hash 后组装成 [Torrent]。 */
     private suspend fun ListItem.buildTorrent(providerName: String): Torrent? {
         val html = runCatching { networkClient.getText(detailsPageUrl) }.getOrNull()
             ?: return null

@@ -30,6 +30,7 @@ class UIndex(private val networkClient: NetworkClient) : SearchProvider, Torrent
         Category.Porn,
         Category.Series,
         Category.Other,
+        Category.Porn,
     )
     override val safetyStatus = SearchProviderSafetyStatus.Safe
     override val isCloudflareProtected = true

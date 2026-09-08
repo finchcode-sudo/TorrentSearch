@@ -11,6 +11,7 @@ import com.prajwalch.torrentsearch.providers.BitSearch
 import com.prajwalch.torrentsearch.providers.BlueRoms
 import com.prajwalch.torrentsearch.providers.Bt4g
 import com.prajwalch.torrentsearch.providers.Btsow
+import com.prajwalch.torrentsearch.providers.Cligou
 import com.prajwalch.torrentsearch.providers.Dmhy
 import com.prajwalch.torrentsearch.providers.Ext
 import com.prajwalch.torrentsearch.providers.Eztv
@@ -60,6 +61,7 @@ private fun provideBuiltinSearchProviders(networkClient: NetworkClient): List<Se
         BlueRoms(networkClient),
         Bt4g(networkClient),
         Btsow(networkClient),
+        Cligou(networkClient),
         Dmhy(networkClient),
         Ext(networkClient),
         Eztv(networkClient),

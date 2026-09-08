@@ -2,7 +2,7 @@
 <resources>
     <string name="button_done">完成</string>
     <string name="button_cancel">取消</string>
-    <string name="nsfw">不适宜内容</string>
+    <string name="nsfw">福利</string>
     <string name="safety_status_unsafe">不安全</string>
     <string name="action_sort">排序</string>
     <string name="action_sort_criteria_name">名称</string>

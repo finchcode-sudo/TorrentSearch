@@ -28,17 +28,32 @@ class Sukebei(private val networkClient: NetworkClient) :
     private val resultsPageParser = SukebeiResultsPageParser(providerName = name)
 
     override suspend fun search(query: String, category: Category): List<Torrent> {
+    val allResults = mutableListOf<Torrent>()
+    var page = 1
+
+    while (true) {
         val requestUrl = buildString {
             append("$url/")
-            // Filter = No filter (0)
             append("?f=0")
-            // Category = All categories (0_0)
             append("&c=0_0")
             append("&q=$query")
+            append("&p=$page")
         }
 
         val responseHtml = networkClient.getText(url = requestUrl)
-        return resultsPageParser.parse(html = responseHtml, pageUrl = requestUrl)
+        val pageResults = resultsPageParser.parse(html = responseHtml, pageUrl = requestUrl)
+
+        // 这一页没有结果了，就停止
+        if (pageResults.isEmpty()) break
+
+        allResults.addAll(pageResults)
+        page++
+
+        // 防止意外无限循环，最多翻 20 页（一般够用了）
+        if (page > 20) break
+    }
+
+    return allResults
     }
 
     override suspend fun getDetails(detailsPageUrl: String): TorrentDetails? {

@@ -32,6 +32,7 @@ class TorrentDownloads(private val networkClient: NetworkClient) : SearchProvide
         Category.Music,
         Category.Series,
         Category.Other,
+        Category.Porn,
     )
     override val isCloudflareProtected = true
     override val enabledByDefault = true

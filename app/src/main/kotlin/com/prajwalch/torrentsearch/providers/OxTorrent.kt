@@ -28,6 +28,7 @@ class OxTorrent(private val networkClient: NetworkClient) : SearchProvider, Late
         Category.Movies,
         Category.Music,
         Category.Series,
+        Category.Porn,
     )
     override val safetyStatus = SearchProviderSafetyStatus.Safe
     override val enabledByDefault = false

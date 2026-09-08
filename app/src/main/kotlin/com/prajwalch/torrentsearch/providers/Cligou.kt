@@ -6,12 +6,10 @@ import com.prajwalch.torrentsearch.domain.model.TorrentDetails
 import com.prajwalch.torrentsearch.network.NetworkClient
 import com.prajwalch.torrentsearch.util.TorrentUtils
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -24,10 +22,10 @@ import java.util.Base64
 /**
  * 磁力狗 (clg62.top / ciligou.net) — 无分类磁力搜索引擎。
  *
- * 该站访问需先提交一次 `act=challenge` 以建立服务端 session，
- * 之后通过 `GET /search?word=<base64(关键词)>&sort=time` 返回结果列表。
- * 列表页本身不含磁力链，磁力只在每条结果的 `/information/<hash>` 详情页中，
- * 因此这里会并发请求详情页以补齐磁力。
+ * 该站上一次搜索前要先 POST 一次 `act=challenge` 以建立服务端 session，
+ * 之后通过 `GET /search?word=<base64(关键词)>&sort=time` 取得结果列表。
+ * 列表页本身不含磁力链，磁力只出现在每条结果的 `/information/<hash>` 详情页中，
+ * 因此这里会对列表项并发请求详情页补齐磁力与 info hash。
  */
 class Cligou(private val networkClient: NetworkClient) :
     SearchProvider,
@@ -44,22 +42,18 @@ class Cligou(private val networkClient: NetworkClient) :
         establishSession()
 
         val word = Base64.getEncoder().encodeToString(query.toByteArray(Charsets.UTF_8))
-        val requestUrl = "$url/search?word=$word&sort=time"
-        val responseHtml = networkClient.getText(requestUrl)
-        // 若仍未取得有效 session，会返回验证壳页面，不是结果列表。
+        val responseHtml = networkClient.getText("$url/search?word=$word&sort=time")
         if (responseHtml.contains(VERIFICATION_MARKER)) return emptyList()
 
-        val items = withContext(Dispatchers.Default) {
-            parseListItems(responseHtml, requestUrl)
-        }
-
+        val items = parseListItems(responseHtml, url)
         val results = mutableListOf<Torrent>()
         val limiter = Semaphore(6)
+
         coroutineScope {
             for (item in items) {
                 launch {
                     limiter.withPermit {
-                        val torrent = item.magnetize()
+                        val torrent = item.buildTorrent(this@Cligou.name)
                         if (torrent != null) {
                             synchronized(results) { results.add(torrent) }
                         }
@@ -72,7 +66,7 @@ class Cligou(private val networkClient: NetworkClient) :
 
     override suspend fun getDetails(detailsPageUrl: String): TorrentDetails? {
         val html = networkClient.getText(detailsPageUrl)
-        return parseDetailsPage(html, detailsPageUrl)
+        return parseDetails(detailsPageUrl, html)
     }
 
     private suspend fun establishSession() {
@@ -93,101 +87,66 @@ class Cligou(private val networkClient: NetworkClient) :
         val detailsUrl = titleEl.absUrl("href")
         if (detailsUrl.isBlank()) return null
 
-        val infoEl = selectFirst(INFO_SELECTOR)
+        val size = selectFirst(SIZE_INFO)?.text()
+        val dateText = selectFirst(DATE_INFO)?.text()
         return ListItem(
             name = title,
-            size = infoEl?.getLabeledValue(LABEL_SIZE),
-            uploadDate = infoEl?.getLabeledValue(LABEL_DATE)?.toInstantOrNull(),
+            size = size?.takeIf { it.isNotBlank() },
+            uploadDate = dateText?.toUploadDate(),
             detailsPageUrl = detailsUrl,
         )
     }
 
-    private fun Element.getLabeledValue(label: String): String? {
-        val labelEm = children().firstOrNull {
-            it.tagName() == "em" && it.ownText().contains(label)
-        } ?: return null
-        val builder = StringBuilder()
-        var next = labelEm.nextElementSibling()
-        while (next != null && !(next.tagName() == "em" && next != labelEm)) {
-            builder.append(next.text()).append(' ')
-            next = next.nextElementSibling() ?: break
-        }
-        return builder.toString().trim().ifEmpty { null }
-    }
-
-    private fun parseDetailsPage(html: String, pageUrl: String): TorrentDetails? =
-        withContext(Dispatchers.Default) {
-            val doc = Jsoup.parse(html, pageUrl)
-            val magnetEl = doc.selectFirst(MAGNET_SELECTOR) ?: return@withContext null
-            val magnetUri = magnetEl.attr("href")
-            if (!magnetUri.startsWith("magnet:?xt=urn:btih:")) return@withContext null
-            val infoHash = TorrentUtils.getInfoHashFromMagnetUri(magnetUri)
-            val title = doc.selectFirst(DETAIL_TITLE_SELECTOR)?.text()?.trim()
-                ?: doc.title().trim()
-            val bodyText = doc.body()?.text().orEmpty()
-
-            TorrentDetails(
-                infoHash = infoHash,
-                name = title,
-                size = extractSize(bodyText),
-                magnetUri = magnetUri,
-                category = Category.Other,
-            )
-        }
-
-    private suspend fun ListItem.magnetize(): Torrent? {
-        if (detailsPageUrl.isBlank()) return null
+    /** 并发抓取某一大项的详情页，取得磁力链与 info hash 后组装成 [Torrent]。 */
+    private suspend fun ListItem.buildTorrent(providerName: String): Torrent? {
         val html = runCatching { networkClient.getText(detailsPageUrl) }.getOrNull()
             ?: return null
-        val details = parseDetailsPage(html, detailsPageUrl) ?: return null
-        val magnet = details.magnetUri ?: return null
+        val details = parseDetails(detailsPageUrl, html) ?: return null
 
         return Torrent(
-            infoHash = TorrentUtils.getInfoHashFromMagnetUri(magnet),
+            infoHash = details.infoHash,
             name = details.name,
             size = details.size ?: size,
-            providerName = Cligou.this.name,
+            seeders = null,
+            peers = null,
+            providerName = providerName,
             uploadDate = details.uploadDate ?: uploadDate,
             category = Category.Other,
             descriptionPageUrl = detailsPageUrl,
-            magnetUri = magnet,
+            magnetUri = details.magnetUri,
+            fileDownloadLink = null,
         )
     }
 
-    private fun extractSize(bodyText: String): String? {
-        val sizeRegex = Regex("""(\d+(?:\.\d+)?)\s*(T|G|M|K)?[i]?B""", RegexOption.IGNORE_CASE)
-        return sizeRegex.findAll(bodyText)
-            .mapNotNull { m ->
-                val unit = m.groupValues[2].uppercase()
-                val unitNorm = normalizeUnit(unit) ?: return@mapNotNull null
-                "${m.groupValues[1]} $unitNorm"
-            }
-            .maxByOrNull {
-                val num = Regex("""\d+(?:\.\d+)?""").find(it)?.value?.toDoubleOrNull() ?: 0.0
-                val u = it.substringAfter(' ', "").take(1)
-                num * when (u) {
-                    "T" -> 1e3
-                    "M" -> 1e-3
-                    "K" -> 1e-6
-                    else -> 1.0
-                }
-            }
+    private fun parseDetails(ignoredPageUrl: String, html: String): TorrentDetails? {
+        val doc = Jsoup.parse(html)
+        val magnetEl = doc.selectFirst(MAGNET_SELECTOR) ?: return null
+        val magnetUri = magnetEl.attr("href")
+        if (!magnetUri.startsWith("magnet:?xt=urn:btih:")) return null
+
+        val infoHash = TorrentUtils.getInfoHashFromMagnetUri(magnetUri)
+        val title = doc.selectFirst(DETAIL_TITLE_SELECTOR)?.text()?.trim()
+            ?: doc.title().trim()
+        val sizeText = doc.selectFirst(SIZE_INFO)?.text()
+        val dateText = doc.selectFirst(DATE_INFO)?.text()
+
+        return TorrentDetails(
+            infoHash = infoHash,
+            name = title,
+            size = sizeText?.takeIf { it.isNotBlank() },
+            uploadDate = dateText?.toUploadDate(),
+            category = Category.Other,
+            magnetUri = magnetUri,
+        )
     }
 
-    private fun normalizeUnit(raw: String): String? = when (raw.uppercase()) {
-        "TB", "TIB" -> "TB"
-        "GB", "GIB" -> "GB"
-        "MB", "MIB" -> "MB"
-        "KB", "KIB" -> "KB"
-        else -> null
-    }
-
-    private fun String.toInstantOrNull(): Instant? =
+    private fun String.toUploadDate(): Instant? =
         Regex("""(\d{4}-\d{2}-\d{2})""").find(this)
-            ?.groupValues?.get(1)
-            ?.let {
+            ?.groupValues
+            ?.get(1)
+            ?.let { dateStr ->
                 runCatching {
-                    LocalDate.parse(it).atStartOfDay().toInstant(ZoneOffset.UTC)
+                    LocalDate.parse(dateStr).atStartOfDay().toInstant(ZoneOffset.UTC)
                 }.getOrNull()
             }
 
@@ -202,10 +161,9 @@ class Cligou(private val networkClient: NetworkClient) :
         const val VERIFICATION_MARKER = "Verification Page"
         const val LIST_ITEM_SELECTOR = "#Search_list_wrapper > li"
         const val RESULT_TITLE_SELECTOR = "a.SearchListTitle_result_title"
-        const val INFO_SELECTOR = ".Search_list_info"
-        const val LABEL_SIZE = "文件大小"
-        const val LABEL_DATE = "创建时间"
+        const val SIZE_INFO = "em:containsOwn(文件大小)"
+        const val DATE_INFO = "em:containsOwn(创建时间)"
         const val MAGNET_SELECTOR = """a[href^="magnet:"]"""
-        const val DETAIL_TITLE_SELECTOR = "h1"
+        const val DETAIL_TITLE_SELECTOR = "h1, [class*=Information_]title, .Information_title"
     }
 }
